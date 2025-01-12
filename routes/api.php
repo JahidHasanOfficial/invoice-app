@@ -11,3 +11,4 @@ Route::get('/user', function (Request $request) {
 
 //api for invoice
 Route::get('/invoices', [InvoiceController::class, 'index']);   
+Route::get('/create_invoice', [InvoiceController::class, 'create_invoice']);   

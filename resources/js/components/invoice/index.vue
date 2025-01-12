@@ -5,9 +5,13 @@
           <div>
             <h2 class="invoice__title">Invoices</h2>
           </div>
+          <!-- <div>
+            <a class="btn btn-secondary" @click="createNewInvoice">New Invoice</a>
+          </div> -->
           <div>
-            <a class="btn btn-secondary">New Invoice</a>
-          </div>
+  <router-link to="/invoice/new" class="btn btn-secondary">New Invoice</router-link>
+</div>
+
         </div>
   
         <div class="table card__content">
@@ -55,7 +59,7 @@
                 type="text"
                 placeholder="Search invoice"
                 v-model="searchQuery"
-                @input="applyFilter"
+                @input="debounce(applyFilter, 300)"
               />
             </div>
           </div>
@@ -73,21 +77,24 @@
           <!-- Invoice Items -->
           <div
             class="table--items"
-            v-for="invoice in filteredData"
+            v-for="invoice in filteredInvoices"
             :key="invoice.id"
           >
             <a href="#" class="table--items--transactionId">{{ invoice.id }}</a>
-            <p>{{ invoice.date }}</p>
+            <p>{{ invoice.date || 'N/A' }}</p>
             <p>{{ invoice.number }}</p>
-            <p>{{ invoice.customer ? invoice.customer.name : 'N/A' }}</p> <!-- Display customer name -->
-            <p>{{ invoice.due_date }}</p>
-            <p>$ {{ invoice.total }}</p>
+            <p>{{ invoice.customer ? invoice.customer.name : 'N/A' }}</p>
+            <p>{{ invoice.due_date || 'N/A' }}</p>
+            <p>$ {{ invoice.total ? invoice.total : 'N/A' }}</p>
           </div>
   
           <!-- No Results Message -->
-          <div v-if="filteredData.length === 0" class="no-results">
+          <div v-if="filteredInvoices.length === 0" class="no-results">
             No invoices found matching your search.
           </div>
+  
+          <!-- Loading State -->
+          <div v-if="loading" class="loading-spinner">Loading...</div>
         </div>
       </div>
     </div>
@@ -95,6 +102,7 @@
   
   <script>
   import axios from "axios";
+  import { useRouter } from "vue-router"; // Correcting import
   
   export default {
     data() {
@@ -110,6 +118,25 @@
     mounted() {
       this.fetchInvoices();
     },
+    computed: {
+      // Computed property for filtered invoices
+      filteredInvoices() {
+        return this.userData.filter((invoice) => {
+          const matchesSearch =
+            invoice.number.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+            (invoice.customer?.name || '').toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+            (invoice.due_date || '').toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+            (invoice.total || '').toString().includes(this.searchQuery.toLowerCase()) ||
+            (invoice.id || '').toString().includes(this.searchQuery.toLowerCase());
+  
+          const matchesFilter =
+            this.filter === 'all' ||
+            (this.filter === 'paid' && invoice.status === 'paid');
+  
+          return matchesSearch && matchesFilter;
+        });
+      },
+    },
     methods: {
       // Fetch invoices from the server
       async fetchInvoices() {
@@ -122,7 +149,6 @@
   
           if (response.data && response.data.data) {
             this.userData = response.data.data;
-            this.filteredData = response.data.data; // Initialize with all data
           } else {
             this.errorMessage = "No user data found";
           }
@@ -138,21 +164,36 @@
       applyFilter() {
         this.filteredData = this.userData.filter((invoice) => {
           const matchesSearch =
-            invoice.number
-              .toString()
-              .toLowerCase()
-              .includes(this.searchQuery.toLowerCase()) ||
-            invoice.customer_id
-              .toString()
-              .toLowerCase()
-              .includes(this.searchQuery.toLowerCase());
+            invoice.number.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+            (invoice.customer?.name || '').toLowerCase().includes(this.searchQuery.toLowerCase());
   
           const matchesFilter =
-            this.filter === "all" ||
-            (this.filter === "paid" && invoice.status === "paid");
+            this.filter === 'all' ||
+            (this.filter === 'paid' && invoice.status === 'paid');
   
           return matchesSearch && matchesFilter;
         });
+      },
+  
+      // Debounce function to optimize search input
+      debounce(func, delay) {
+        let timeout;
+        return (...args) => {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(this, args), delay);
+        };
+      },
+  
+      // Method to create a new invoice
+      async createNewInvoice() {
+        try {
+          let form = await axios.get('/api/create_invoice'); // Fetch form data if necessary
+          console.log('form', form.data);
+          const router = useRouter(); // Corrected router usage
+          router.push('/invoice/new'); // Navigate to the new invoice page
+        } catch (error) {
+          console.error('Error creating new invoice:', error);
+        }
       },
     },
   };
@@ -164,6 +205,13 @@
     margin-top: 20px;
     font-size: 16px;
     color: gray;
+  }
+  
+  .loading-spinner {
+    text-align: center;
+    font-size: 18px;
+    color: gray;
+    margin-top: 20px;
   }
   </style>
   
